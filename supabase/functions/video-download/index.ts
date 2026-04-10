@@ -3,8 +3,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import YTDlpWrap from "npm:ytdlp-nodejs@latest";
 
-// IMPORTANT: Order headers alphabetically and include ALL standard headers first
-// Supabase truncates custom headers, so put x-device-id at the END
+// CRITICAL: Define CORS headers at the very top, before any other code
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
@@ -12,14 +11,15 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
-  // Handle CORS preflight - MUST be first, return 204 status
+  // CRITICAL: Handle OPTIONS immediately - NO code before this
   if (req.method === "OPTIONS") {
-    return new Response(null, {
-      status: 204,
-      headers: corsHeaders,
+    return new Response("ok", { 
+      status: 200,  // Some browsers expect 200, not 204
+      headers: corsHeaders 
     });
   }
 
+  // NOW we can do the actual work
   try {
     const { url, quality = "720", format = "mp4" } = await req.json();
     const deviceId = req.headers.get("x-device-id") || "unknown";
@@ -112,23 +112,18 @@ serve(async (req) => {
       }), 
       { 
         status: 200,
-        headers: { 
-          ...corsHeaders, 
-          "Content-Type": "application/json" 
-        }
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
       }
     );
 
   } catch (error) {
     console.error("Function error:", error);
+    // CRITICAL: Always return CORS headers even on error
     return new Response(
       JSON.stringify({ success: false, error: error.message }),
       { 
         status: 400, 
-        headers: { 
-          ...corsHeaders, 
-          "Content-Type": "application/json" 
-        }
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
       }
     );
   }
