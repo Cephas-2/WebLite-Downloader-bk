@@ -3,14 +3,21 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import YTDlpWrap from "npm:ytdlp-nodejs@latest";
 
+// IMPORTANT: Order headers alphabetically and include ALL standard headers first
+// Supabase truncates custom headers, so put x-device-id at the END
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-device-id",
 };
 
 serve(async (req) => {
+  // Handle CORS preflight - MUST be first, return 204 status
   if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+    return new Response(null, {
+      status: 204,
+      headers: corsHeaders,
+    });
   }
 
   try {
@@ -24,10 +31,10 @@ serve(async (req) => {
       Deno.env.get("MY_SERVICE_ROLE_KEY")!
     );
 
-    // Initialize YTDlpWrap - this is the default export class
+    // Initialize YTDlpWrap
     const ytDlp = new YTDlpWrap();
     
-    // Use getVideoInfo (not getInfoAsync) - this is the correct method name
+    // Use getVideoInfo
     const videoInfo = await ytDlp.getVideoInfo(url);
     const title = videoInfo.title || "video";
     const duration = videoInfo.duration?.toString() || "0";
@@ -40,7 +47,7 @@ serve(async (req) => {
     const outputExt = isAudioOnly ? "mp3" : "mp4";
     const tempFile = `/tmp/download_${Date.now()}.${outputExt}`;
 
-    // Use execPromise with proper arguments (this is the reliable method)
+    // Use execPromise with proper arguments
     await ytDlp.execPromise([
       "-f", isAudioOnly ? "bestaudio" : `bestvideo[height<=${height}]+bestaudio/best`,
       "--merge-output-format", outputExt,
@@ -103,14 +110,26 @@ serve(async (req) => {
         expires_in: "2 hours",
         size: fileData.length
       }), 
-      { headers: { ...corsHeaders, "Content-Type": "application/json" }}
+      { 
+        status: 200,
+        headers: { 
+          ...corsHeaders, 
+          "Content-Type": "application/json" 
+        }
+      }
     );
 
   } catch (error) {
     console.error("Function error:", error);
     return new Response(
       JSON.stringify({ success: false, error: error.message }),
-      { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" }}
+      { 
+        status: 400, 
+        headers: { 
+          ...corsHeaders, 
+          "Content-Type": "application/json" 
+        }
+      }
     );
   }
 });
